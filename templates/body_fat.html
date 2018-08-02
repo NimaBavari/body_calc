@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% set active_page = 'body_fat' %}
+
+{% block content %}
+    <h3>{{ title.upper() }}</h3>
+    <form action="" method="POST" novalidate>
+        {{ form.hidden_tag() }}
+        <table>
+            {% for field in form %}
+                {% if not field.type in ['SubmitField', 'CSRFTokenField'] %}
+                    {% if field.errors %}
+                        {% for error in field.errors %}
+                            <tr>
+                                <td></td>
+                                <td class="error-box">
+                                    <span class="warning">{{ error }}</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <td>{{ field.label }}:</td>
+                            <td><fieldset>{{ field(class="error-field") }}</fieldset></td>
+                            <td>{{ field.render_kw['unit'] }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td>{{ field.label }}:</td>
+                            <td><fieldset>{{ field }}</fieldset></td>
+                            <td>{{ field.render_kw['unit'] }}</td>
+                        </tr>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+            <tr>
+                <td></td>
+                <td>{{ form.submit }}</td>
+                <td></td>
+            </tr>
+        </table>
+    </form>
+    {% if form.validate_on_submit() %}
+        <div class="result">
+            Your body fat is {{body_fat}}%.
+            {% if lean_body_mass %}
+                <p>Your lean body mass is {{lean_body_mass}} kg.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}
