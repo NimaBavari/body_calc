@@ -1,5 +1,6 @@
 from datetime import date
 from math import log, log10, sqrt
+from statistics import geometric_mean
 
 from flask import Flask, redirect, render_template, url_for
 
@@ -9,6 +10,9 @@ from forms import (AbsPowerCalculatorForm, BodyAttrCalculatorForm,
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8746f582de105b3c3f2a7edc2e85ea49'
+
+DIFF_REL = 0.31731050786291404
+DIFF_ABS = 28
 
 
 @app.route('/')
@@ -33,7 +37,7 @@ def weight_goal():
         r_raw = act_level * (66.473 + 6.8758 * (curr_weight + goal_weight)
                              + 2.50165 * (curr_height + pred_height) - 6.755
                              * 2 / 1461 * (curr_age + goal_age)) + 7716 * \
-                             (goal_weight - curr_weight) / days_to_goal
+            (goal_weight - curr_weight) / days_to_goal
         result = round(r_raw, 2)
     return render_template(
         'weight_goal.html',
@@ -43,18 +47,23 @@ def weight_goal():
     )
 
 
-def normalize(quant, ref, ideal, diff=True):
-    diff = 28 if diff else 0.31731050786291404 * ideal
+def normalize(quant, ref, ideal):
+    diff = DIFF_REL * ideal
     if abs(quant / ref - ideal) < diff:
         return (1 - abs(quant / ref - ideal) / diff) * 100
     return 0
 
 
-def gmean(seq):
-    prod = 1
-    for item in seq:
-        prod *= item
-    return prod ** (1 / len(seq))
+def normalize_height(quant, ideal_lower, ideal_upper):
+    if quant < ideal_lower:
+        if ideal_lower - quant < DIFF_ABS:
+            return (DIFF_ABS + quant - ideal_lower) * 100 / DIFF_ABS
+        return 0
+    if quant > ideal_upper:
+        if quant - ideal_upper < DIFF_ABS:
+            return (DIFF_ABS + ideal_upper - quant) * 100 / DIFF_ABS
+        return 0
+    return 100
 
 
 @app.route('/body_attr', methods=['GET', 'POST'])
@@ -63,31 +72,19 @@ def body_attr():
     form = BodyAttrCalculatorForm()
     attractiveness = None
     if form.validate_on_submit():
-        u_vals = {
-            'height':       form.height.data,
-            'wrist':        form.wrist.data,
-            'chest':        form.chest.data,
-            'biceps':       form.biceps.data,
-            'thigh':        form.thigh.data,
-            'calf':         form.calf.data,
-            'waist':        form.waist.data,
-            'neck':         form.neck.data,
-            'shoulder':     form.shoulder.data,
-            'hips':         form.hips.data
-        }
         points = [
-            normalize(u_vals['height'], 1, 180.5),
-            normalize(u_vals['wrist'], u_vals['height'], 9/91, False),
-            normalize(u_vals['chest'], u_vals['wrist'], 13/2, False),
-            normalize(u_vals['biceps'], u_vals['chest'], 0.36, False),
-            normalize(u_vals['thigh'], u_vals['chest'], 0.53, False),
-            normalize(u_vals['calf'], u_vals['chest'], 0.34, False),
-            normalize(u_vals['waist'], u_vals['chest'], 0.70, False),
-            normalize(u_vals['neck'], u_vals['chest'], 0.37, False),
-            normalize(u_vals['hips'], u_vals['chest'], 0.85, False),
-            normalize(u_vals['shoulder'], u_vals['waist'], 1.61803, False)
+            normalize_height(form.height.data, 180.5, 195.5),
+            normalize(form.wrist.data, form.height.data, 9/91),
+            normalize(form.chest.data, form.wrist.data, 13/2),
+            normalize(form.biceps.data, form.chest.data, 0.36),
+            normalize(form.thigh.data, form.chest.data, 0.53),
+            normalize(form.calf.data, form.chest.data, 0.34),
+            normalize(form.waist.data, form.chest.data, 0.70),
+            normalize(form.neck.data, form.chest.data, 0.37),
+            normalize(form.hips.data, form.chest.data, 0.85),
+            normalize(form.shoulder.data, form.waist.data, 1.61803),
         ]
-        attractiveness = round(gmean(points), 2)
+        attractiveness = round(geometric_mean(points), 2)
     return render_template(
         'body_attr.html',
         title=title,
